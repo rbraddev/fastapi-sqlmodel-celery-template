@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  api:
+    build: ./backend
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend/app:/app/app
+    ports:
+      - 8000:8000
+    env_file:
+      - .env
+    depends_on:
+      - app-db
+    
+  app-db:
+    image: postgres:16
+    expose:
+      - 5432
+    env_file:
+      - .env
+  
+  worker:
+    build: ./backend
+    command: celery -A app.main.celery worker --loglevel=info
+    volumes:
+      - ./project:/usr/src/app
+    env_file:
+      - .env
+    depends_on:
+      - api
+      - redis
+
+  flower:
+    build: ./backend
+    command: celery --broker=redis://redis:6379/0 flower --port=5555
+    ports:
+      - 5556:5555
+    env_file:
+      - .env
+    depends_on:
+      - api
+      - worker
+      - redis
+
+  redis:
+    image: redis:7
